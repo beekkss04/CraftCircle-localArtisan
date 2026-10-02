@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CraftCircle demo: pooled order window</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;family=Fraunces:wght@600;700&amp;display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4EEE4;--card:#FFFDF8;--ink:#2A2521;--mute:#5E5347;--line:#D8CBB8;--teal:#1F4E4A;--teal-ink:#F4EEE4;--clay:#B4532A;--sand:#F5D3B3;--ok:#2F7A4B;--ok-ink:#FFFFFF;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171C1B;--card:#1F2625;--ink:#F1EBE0;--mute:#B9AFA1;--line:#34403E;--teal:#2F7A72;--teal-ink:#FFFFFF;--clay:#E08A63;--sand:#3A2E25;--ok:#6CC48C;--ok-ink:#10241A}}
+:root[data-theme="dark"]{--bg:#171C1B;--card:#1F2625;--ink:#F1EBE0;--mute:#B9AFA1;--line:#34403E;--teal:#2F7A72;--teal-ink:#FFFFFF;--clay:#E08A63;--sand:#3A2E25;--ok:#6CC48C;--ok-ink:#10241A}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 'DM Sans',system-ui,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding-bottom:16px}
+h1{font-family:'Fraunces',Georgia,serif;font-size:32px;line-height:1.1;margin:0}
+h2{font-family:'Fraunces',Georgia,serif;font-size:22px;margin:0 0 12px}
+.sub{color:var(--mute);margin:0}
+.layout{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}.panel{position:static!important}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.tile{height:84px;padding:12px;font-size:14px;font-weight:700;color:#2A2521;display:flex;align-items:flex-end}
+.body{padding:14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.name{font-weight:700}
+.meta{font-size:14px;color:var(--mute)}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px}
+.qty{display:flex;align-items:center;gap:8px}
+.qty span{min-width:18px;text-align:center;font-weight:700}
+button{font:inherit;cursor:pointer}
+.qbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px}
+.qbtn:disabled{opacity:.4;cursor:not-allowed}
+.panel{position:sticky;top:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.lbl{display:flex;justify-content:space-between;font-size:15px;margin-bottom:6px}
+.meter{height:14px;border-radius:7px;background:var(--line);position:relative;overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--teal);width:0}
+.prev{position:absolute;top:0;bottom:0;background:var(--clay);opacity:.6;width:0}
+.status{padding:12px 14px;border-radius:10px;background:var(--sand);font-weight:500}
+.status.ok{background:var(--ok);color:var(--ok-ink)}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:15px}
+ul.list li{display:flex;justify-content:space-between;gap:12px}
+.tot{display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.ship{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.ship div{display:flex;justify-content:space-between}
+.primary{background:var(--teal);color:var(--teal-ink);border:0;border-radius:10px;padding:14px 18px;font-weight:700;min-height:48px}
+.primary:disabled{opacity:.5;cursor:not-allowed}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-height:44px}
+.acts{display:flex;flex-direction:column;gap:10px}
+.note{font-size:14px;color:var(--mute);margin:24px 0 0}
+:focus-visible{outline:3px solid var(--clay);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>CraftCircle</h1>
+<p class="sub">Kharghar society pod · this window closes Sunday 8 pm</p>
+</header>
+<div class="layout">
+<main>
+<h2>This week's catalogue</h2>
+<div class="grid" id="grid"></div>
+<p class="note">Demo with sample items and sample pool data. Members are charged only when the pool confirms at ₹10,000 and 6 members.</p>
+</main>
+<aside class="panel" aria-label="Pool status and your order">
+<div>
+<div class="lbl"><span>Order value pledged</span><b id="valTxt"></b></div>
+<div class="meter"><div class="fill" id="fillA"></div><div class="prev" id="prevA"></div></div>
+</div>
+<div>
+<div class="lbl"><span>Members in the pool</span><b id="memTxt"></b></div>
+<div class="meter"><div class="fill" id="fillM"></div><div class="prev" id="prevM"></div></div>
+</div>
+<div class="status" id="status" role="status" aria-live="polite"></div>
+<div>
+<h2 style="font-size:18px">Your basket</h2>
+<ul class="list" id="basket"></ul>
+<div class="tot"><span>Basket total</span><span id="total"></span></div>
+</div>
+<div class="ship">
+<div><span>Shipped on your own</span><b id="indiv"></b></div>
+<div><span>Your share of the pooled trip</span><b id="share"></b></div>
+<div><span>You save</span><b id="save"></b></div>
+<div><span>Whole pool saves in logistics</span><b id="poolSave"></b></div>
+</div>
+<div class="acts">
+<button class="primary" id="pledge">Pledge my order</button>
+<button class="ghost" id="sim">Add another member's pledge</button>
+<button class="ghost" id="reset">Reset demo</button>
+</div>
+</aside>
+</div>
+</div>
+<script>
+var ITEMS=[
+{id:1,n:'Block-printed table runner',cat:'Textiles',p:1150,lead:'Ready stock',c:'#E9C9A6'},
+{id:2,n:'Terracotta planter set',cat:'Home décor',p:890,lead:'Ready stock',c:'#D9A28A'},
+{id:3,n:'Painted wall plate',cat:'Home décor',p:1450,lead:'Made to order, 4 days',c:'#9FC3BD'},
+{id:4,n:'Handwoven jute basket',cat:'Storage',p:720,lead:'Ready stock',c:'#E6D7A8'},
+{id:5,n:'Blue pottery serving bowl',cat:'Kitchen',p:1280,lead:'Made to order, 5 days',c:'#A9BFD9'},
+{id:6,n:'Brass diya set',cat:'Gifting',p:980,lead:'Ready stock',c:'#EBC77E'},
+{id:7,n:'Bamboo cutlery roll',cat:'Kitchen',p:540,lead:'Ready stock',c:'#B9D3A8'},
+{id:8,n:'Soy candle trio',cat:'Gifting',p:640,lead:'Made to order, 3 days',c:'#E3B7C5'}
+];
+var MIN_VALUE=10000,MIN_MEMBERS=6,SOLO=225,POOL_TRIP=700;
+var state;
+function fresh(){state={basket:{},amount:7800,members:5,pledged:false};}
+fresh();
+function $(id){return document.getElementById(id);}
+function money(n){return '₹'+n.toLocaleString('en-IN');}
+function total(){return ITEMS.reduce(function(s,i){return s+i.p*(state.basket[i.id]||0);},0);}
+$('grid').innerHTML=ITEMS.map(function(i){
+return '<div class="card"><div class="tile" style="background:'+i.c+'">'+i.cat+'</div><div class="body"><div class="name">'+i.n+'</div><div class="meta">'+i.lead+'</div><div class="row"><b>'+money(i.p)+'</b><div class="qty"><button class="qbtn" data-id="'+i.id+'" data-d="-1" aria-label="Remove one '+i.n+'">\u2212</button><span id="q'+i.id+'">0</span><button class="qbtn" data-id="'+i.id+'" data-d="1" aria-label="Add one '+i.n+'">+</button></div></div></div></div>';
+}).join('');
+$('grid').addEventListener('click',function(e){
+var b=e.target.closest('button[data-id]');
+if(!b||state.pledged)return;
+var id=+b.dataset.id;
+state.basket[id]=Math.max(0,(state.basket[id]||0)+(+b.dataset.d));
+update();
+});
+$('pledge').addEventListener('click',function(){
+var t=total();
+if(t>0&&!state.pledged){state.amount+=t;state.members+=1;state.pledged=true;update();}
+});
+$('sim').addEventListener('click',function(){state.amount+=1500;state.members+=1;update();});
+$('reset').addEventListener('click',function(){fresh();update();});
+function update(){
+var t=total(),draft=!state.pledged&&t>0;
+var amt=state.amount+(draft?t:0),mem=state.members+(draft?1:0);
+var fa=Math.min(100,state.amount/MIN_VALUE*100),fm=Math.min(100,state.members/MIN_MEMBERS*100);
+var pa=draft?Math.min(100-fa,t/MIN_VALUE*100):0,pm=draft?Math.min(100-fm,100/MIN_MEMBERS):0;
+$('valTxt').textContent=money(amt)+' of '+money(MIN_VALUE);
+$('memTxt').textContent=mem+' of '+MIN_MEMBERS;
+$('fillA').style.width=fa+'%';$('prevA').style.left=fa+'%';$('prevA').style.width=pa+'%';
+$('fillM').style.width=fm+'%';$('prevM').style.left=fm+'%';$('prevM').style.width=pm+'%';
+var met=amt>=MIN_VALUE&&mem>=MIN_MEMBERS,st=$('status'),msg;
+st.className='status';
+if(state.pledged&&met){msg='Pool confirmed. Payment is captured, purchase orders go to the artisans, and delivery follows in 7-10 days.';st.className='status ok';}
+else if(state.pledged){msg="You're in. The pool still needs "+money(Math.max(0,MIN_VALUE-amt))+' and '+Math.max(0,MIN_MEMBERS-mem)+' more member(s) before Sunday 8 pm. It extends once by 3 days if needed.';}
+else if(t===0){msg='Add items to see how close the pool is to confirming.';}
+else if(met){msg='Your basket tips the pool over the line. Pledge to confirm it.';}
+else{msg='Pool needs '+money(Math.max(0,MIN_VALUE-amt))+' and '+Math.max(0,MIN_MEMBERS-mem)+' more member(s) once your basket is in.';}
+st.textContent=msg;
+$('basket').innerHTML=t===0?'<li>Your basket is empty. Add items from the catalogue.</li>':ITEMS.filter(function(i){return state.basket[i.id];}).map(function(i){return '<li><span>'+state.basket[i.id]+' × '+i.n+'</span><span>'+money(i.p*state.basket[i.id])+'</span></li>';}).join('');
+$('total').textContent=money(t);
+var m=Math.max(1,mem),share=POOL_TRIP/m;
+$('indiv').textContent=money(SOLO);
+$('share').textContent='₹'+share.toFixed(2);
+$('save').textContent='₹'+(SOLO-share).toFixed(2);
+$('poolSave').textContent=money(Math.max(0,SOLO*m-POOL_TRIP));
+ITEMS.forEach(function(i){$('q'+i.id).textContent=state.basket[i.id]||0;});
+document.querySelectorAll('.qbtn').forEach(function(b){b.disabled=state.pledged;});
+var pb=$('pledge');
+pb.disabled=state.pledged||t===0;
+pb.textContent=state.pledged?'Order pledged':(t===0?'Add items to pledge':'Pledge my order');
+}
+update();
+</script>
+</body>
+</html>
